@@ -1,1 +1,0 @@
-# scala-homework-3

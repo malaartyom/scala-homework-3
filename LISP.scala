@@ -4,9 +4,11 @@
 // Therefore, with this import we make it possible to assign
 // instances of both `mutable.Map` and `immutable.Map` to the
 // variables of type `Map` (`scala.collection.Map`).
+import LISP.Expression
 import LISP.Expression.*
 import LispDSL.*
 
+import scala.annotation.tailrec
 import scala.collection.Map
 
 
@@ -17,21 +19,48 @@ import scala.collection.Map
   */
 object LISP {
   
-  private def print(args: Seq[Expression]): Expression = {
-    
+  private def printCmd(args: Seq[Expression]): Expression = {
+    @tailrec
+    def innerPrint(arg: Expression): Unit = {
+      arg match {
+        case Number(value) => print(value)
+        case String(value) => print(value)
+        case Symbol(value) => print(value)
+        case List(value) => printCmd(value)
+        case Quote(value) => innerPrint(value)
+        case Plus => print("<plus>")
+        case Multiply => print("<minus>")
+        case Print => print("<print>")
+        case Lambda(args, body, env) => print("<lambda>")
+      }
+    }
+    args.foreach(* => innerPrint(*))
     Expression.List(Seq.empty)
   }
 
-  private def plus(numbers: Seq[Expression]): Double = {
+  private def plus(numbers: Seq[Expression]): Expression = {
     var s = 0.0
     for (x <- numbers) s += x.asInstanceOf[Number].value
-    s
+    Number(s)
   }
 
-  private def multiply(numbers: Seq[Expression]): Double = {
+  private def multiply(numbers: Seq[Expression]): Expression = {
     var s = 1.0
     for (x <- numbers) s *= x.asInstanceOf[Number].value
-    s
+    Number(s)
+  }
+  
+  private def lambda(args: Seq[Expression], body: Expression, environment: Environment, value: Seq[Expression]) = {
+    var tmp = environment
+    if (value.drop(1).length != args.length) {
+      throw RuntimeException(s"Different length of args!")
+    }
+    for (i <- args.indices) {
+      tmp += (args(i).asInstanceOf[Symbol] -> value(i))
+    }
+    evaluate(body, env=tmp)
+    
+
   }
 
 
@@ -98,15 +127,15 @@ object LISP {
       * Look `utils.scala` to find the implementation,
       * and `sanity_check.scala` to find use cases.
       */
-
-    Map(
-      "nil".s -> l(), //
-      "nil?".s -> lam(Seq("x".s), l("==".s, "x".s, l().q), globalEnvironment),
-      "*".s -> Multiply,
-      "quote".s -> lam(Seq("x".s), "x".s.q, globalEnvironment),
+    var nested = Map(
+      "nil".s -> l(),
+      "*".s -> Multiply, 
       "+".s -> Plus,
       "print".s -> Print
       /** Implement other definitions here. */)
+    nested += ("quote".s -> lam(Seq("x".s), "x".s.q, nested))
+    nested += ("nil?".s -> lam(Seq("x".s), l("==".s, "x".s, l().q), nested))
+    nested
   }
   /** Evaluates some expression `expr` knowing about given environment `env`.
     *
@@ -122,7 +151,7 @@ object LISP {
     case Multiply => expr
     case Quote(value) => value
     case Symbol(value) => env(Symbol(value))
-    case Lambda(_, _, _) => ???
+    case Lambda(_, _, _) => expr
     case List(value) =>
       var x = scala.collection.immutable.List[Expression]()
       for (y <- value) {
@@ -130,9 +159,11 @@ object LISP {
       }
       val head = x.head
       head match {
-        case Plus => Number(plus(value.drop(1)))
-        case Multiply => Number(multiply(value.drop(1)))
-        case Print => print(value.drop(1))
+        case Plus => plus(value.drop(1))
+        case Multiply => multiply(value.drop(1))
+        case Print => printCmd(value.drop(1))
+        case Lambda(args, body, env) => lambda()
+        
       }
    }
   }
