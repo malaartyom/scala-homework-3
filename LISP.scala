@@ -23,7 +23,7 @@ object LISP {
     @tailrec
     def innerPrint(arg: Expression): Unit = {
       arg match {
-        case Number(value) => print(value)
+        case Number(value) => Predef.print(value)
         case String(value) => print(value)
         case Symbol(value) => print(value)
         case List(value) => printCmd(value)
@@ -37,6 +37,10 @@ object LISP {
     args.foreach(* => innerPrint(*))
     Expression.List(Seq.empty)
   }
+  private def equals(args: Seq[Expression]): Expression = {
+    if (args.length != 2) throw RuntimeException("Too many arguments fro function equals")
+    if (args.head.equals(args(1))) return Expression.String("t") else Expression.List(Seq.empty)
+  }
 
   private def plus(numbers: Seq[Expression]): Expression = {
     var s = 0.0
@@ -49,17 +53,17 @@ object LISP {
     for (x <- numbers) s *= x.asInstanceOf[Number].value
     Number(s)
   }
-  
+
   private def lambda(args: Seq[Expression], body: Expression, environment: Environment, value: Seq[Expression]) = {
     var tmp = environment
-    if (value.drop(1).length != args.length) {
+    if (value.length != args.length) {
       throw RuntimeException(s"Different length of args!")
     }
-    for (i <- args.indices) {
-      tmp += (args(i).asInstanceOf[Symbol] -> value(i))
+    for (i <- 0 until args.length) {
+      tmp += (args(i).asInstanceOf[Symbol] -> evaluate(value(i), environment))
     }
-    evaluate(body, env=tmp)
-    
+    evaluate(body, tmp)
+
 
   }
 
@@ -110,6 +114,8 @@ object LISP {
     case Plus
     case Multiply
     case Print
+    case Lam
+    case Equals
   }
 
   /** Mapping between symbols and expressions (variable identifiers and their values). */
@@ -129,9 +135,11 @@ object LISP {
       */
     var nested = Map(
       "nil".s -> l(),
-      "*".s -> Multiply, 
+      "*".s -> Multiply,
       "+".s -> Plus,
-      "print".s -> Print
+      "==".s -> Equals,
+      "print".s -> Print,
+      "lambda".s -> Lam,
       /** Implement other definitions here. */)
     nested += ("quote".s -> lam(Seq("x".s), "x".s.q, nested))
     nested += ("nil?".s -> lam(Seq("x".s), l("==".s, "x".s, l().q), nested))
@@ -155,15 +163,22 @@ object LISP {
     case List(value) =>
       var x = scala.collection.immutable.List[Expression]()
       for (y <- value) {
-        x = x.appended(evaluate(y))
+        x = x.appended(evaluate(y, env))
       }
       val head = x.head
       head match {
-        case Plus => plus(value.drop(1))
-        case Multiply => multiply(value.drop(1))
-        case Print => printCmd(value.drop(1))
-        case Lambda(args, body, env) => lambda()
-        
+        case Plus => plus(x.drop(1))
+        case Multiply => multiply(x.drop(1))
+        case Print => printCmd(x.drop(1))
+        case Equals => equals(x.drop(1))
+        case Lam => ??? // create Lambda using value[1], value[2], value[3], ....
+        case Lambda(args, body, env) => lambda(args, body, env, value.drop(1))
+        case Expression.String(_) => ???
+        case Expression.Number(_) => ???
+        case Expression.Symbol(_) => ???
+        case Expression.List(_) => ???
+        case Expression.Quote(_) => ???
+
       }
    }
   }
