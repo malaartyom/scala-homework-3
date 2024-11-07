@@ -1,8 +1,6 @@
-import TestingDSL.test
-import LispDSL.*
+
 
 @main def runSanityCheck = {
-  import LISP.{Expression, macroexpand, evaluate as eval}
 
   /** This modules are defined in `utils.scala`. Look this file to find their implementation. */
 

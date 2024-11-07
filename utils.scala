@@ -1,8 +1,6 @@
-import scala.annotation.targetName
 import scala.language.implicitConversions
 
 object LispDSL {
-  import LISP.*
 
   /** Constructs List expression from given expressions. */
   def l(exprs: Expression*): Expression = Expression.List(exprs)
